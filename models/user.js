@@ -30,7 +30,15 @@ const userSchema = new Schema({
     avatarUrl: {
         type: String,
         required: true
-    }
+    },
+    verify: {
+        type: Boolean,
+        default: false
+    },
+    verificationCode: {
+        type: String,
+        default: '',
+    },
 }, {
     versionKey: false,
 });
@@ -50,8 +58,13 @@ const subscriptionSchema = Joi.object({
     subscription: Joi.string().valid('starter', 'pro', 'business').required()
 });
 
+const emailSchema = Joi.object({
+    email: Joi.string().pattern(emailRegex).required()
+});
+
 module.exports = {
     User,
     logRegSchema,
-    subscriptionSchema
+    subscriptionSchema,
+    emailSchema
 };

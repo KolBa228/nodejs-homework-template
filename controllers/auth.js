@@ -2,6 +2,8 @@ const { User } = require('../models/user');
 
 const bcrypt = require('bcryptjs');
 
+const { nanoid } = require('nanoid');
+
 const fs = require('fs');
 
 const gravatar = require('gravatar');
@@ -16,7 +18,7 @@ const TOKEN_KEY = 'hashfhhjgh1k2h3kjho9999888'
 
 const HttpErr = require('../helpers/HttpErr');
 
-const { ctrlWrapper } = require('../midlleware');
+const { ctrlWrapper, sendEmail } = require('../midlleware');
 
 const subscriptionSchema = require('../models/user')
 
@@ -29,8 +31,16 @@ const register = async (req, res) => {
 
     const hashPassword = await bcrypt.hash(password, 10);
     const avatarUrl = gravatar.url(email);
+    const verificationCode = nanoid();
 
-    const newUser = await User.create({...req.body, password: hashPassword, avatarUrl});
+    const newUser = await User.create({ ...req.body, password: hashPassword, avatarUrl, verificationCode });
+    const verifyEmail = {
+        to: email,
+        subject: 'Verify email',
+        html: `<a target='_blank' href='https://localhost:3000/api/auth/verify${verificationCode}'>Click to verify your email</a>`
+    };
+
+    await sendEmail(verifyEmail);
 
     res.status(201).json({
         email: newUser.email,
@@ -38,11 +48,44 @@ const register = async (req, res) => {
     });
 };
 
+const verifyEmail = async (req, res) => {
+    const { verificationCode } = req.params;
+    const user = User.findOne({ verificationCode })
+    if (!user) {
+        throw HttpErr(401, 'Email not found')
+    }
+    await User.findByIdAndUpdate(user._id, { verify: true, verificationCode: '' });
+    res.json({
+        message: 'Email verified success'
+    });
+};
+
+const resendVerifyEmail = async (req, res) => {
+    const { email } = req.body;
+    const user = User.findOne({ email });
+    if (!user) {
+        throw HttpErr(401, 'Email not found')
+    };
+    if (user.verify) {
+        throw HttpErr(401, 'Email already verified')
+    };
+    const verifyEmail = {
+        to: email,
+        subject: 'Verify email',
+        html: `<a target='_blank' href='https://localhost:3000/api/auth/verify${user.verificationCode}'>Click to verify your email</a>`
+    };
+    await sendEmail(verifyEmail);
+}
+
 const login = async (req, res) => {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
 
     if (!user) {
+        throw HttpErr(401, 'Email or password invalide')
+    };
+
+    if (!user.verify) {
         throw HttpErr(401, 'Email or password invalide')
     };
 
@@ -159,6 +202,8 @@ const setAvatar = async (req, res) => {
 
 module.exports = {
     register: ctrlWrapper(register),
+    verifyEmail: ctrlWrapper(verifyEmail),
+    resendVerifyEmail: ctrlWrapper(resendVerifyEmail),
     login: ctrlWrapper(login),
     getCurrent: ctrlWrapper(getCurrent),
     logOut: ctrlWrapper(logOut),

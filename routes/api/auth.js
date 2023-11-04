@@ -2,13 +2,18 @@ const express = require('express');
 
 const { authenticate, validateBody, upload } = require('../../midlleware');
 
-const { logRegSchema, subscriptionSchema } = require('../../models/user');
+const { logRegSchema, subscriptionSchema, emailSchema } = require('../../models/user');
 
-const ctrl = require('../../controllers/auth')
+const ctrl = require('../../controllers/auth');
+const { verify } = require('jsonwebtoken');
 
 const router = express.Router();
 
 router.post('/register', validateBody(logRegSchema), ctrl.register);
+
+router.get('/verify/:verificationCode', ctrl.verifyEmail);
+
+router.post('/verify', validateBody(emailSchema), ctrl.resendVerifyEmail);
 
 router.post('/login', validateBody(logRegSchema), ctrl.login);
 
